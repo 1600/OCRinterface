@@ -22,9 +22,9 @@ class OCR():
     def __init__(self):
         pass
     
-    def getScreenshot(self,url):
+    def getScreenshot(self,url):        #TODO replace this with a solely-project-wise api account.
         save_to_file = 'screenshot.jpg'
-        access_key = "b1da900243d8551000dabfa9074491bf"
+        access_key = ""
         viewport_big = '1440x900'
         viewport_small = '414x736'
         is_fullpage = '1'
@@ -125,22 +125,21 @@ class OCR():
         print "extracting word from :",filePath
         default_inputfile = filePath
         datagen, headers = multipart_encode({"imageFile": open(default_inputfile, "rb")})
-        headers['Host']='aligreen.alibaba.com'
+        headers['Host']='1'
         headers['Connection']='keep-alive'
         headers['Accept']='application/json, text/javascript, */*; q=0.01'
         headers['Origin']='http://aligreen.alibaba.com'
         headers['X-Requested-With']='XMLHttpRequest'
         headers['Accept-Encoding']='gzip, deflate'
         headers['Accept-Language']='zh-CN,zh;q=0.8'
-        headers['Cookie']='cna=6c9rEM7A8W0CAbeB2ukCuutX; l=AmtrPA8gwLaNmLmcW7nvXzBMe4VXhn8C; isg=Am9vM74Oa-OMeG_fwI48Af5s_oMVAuQaV5JRi4H-DV7l0I7SieBphhXGJHeU'
         headers['User-Agent']='Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36'
         register_openers()
-        request = urllib2.Request("http://aligreen.alibaba.com/rpc/image/upload_image.json", datagen, headers)
+        request = urllib2.Request("http://1.json", datagen, headers)
         upload_result = urllib2.urlopen(request).read()
         #print upload_result
         tempdict = json.loads(upload_result)
         imageurl = tempdict['imageUploadResultList'][0]['imageUrl']
-        detection_url = 'http://aligreen.alibaba.com/rpc/image/detect.json'
+        detection_url = 'http://2.json'
         payload = {'imageUrls[]': imageurl, 'scene': 'ocr'}
         headers = {'Host':'aligreen.alibaba.com','Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'Content-Length': '2'}
         r = requests.post(detection_url,data=payload)
@@ -193,6 +192,5 @@ class OCR():
 
 if __name__ == '__main__':
     a = OCR()
-    #http://www.68169f.com
-    print a.run('http://www.s368.net')
-    a.clean('http://www.s368.net')
+    print a.run('http://1.net')
+    a.clean('http://1.net')
