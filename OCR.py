@@ -13,68 +13,81 @@ from bs4 import BeautifulSoup
 from poster.encode import multipart_encode
 from poster.streaminghttp import register_openers
 from selenium import webdriver
-from PIL import Image
+from shutil import rmtree
+import ImageProcessing_
+import sensitive_words
+
 
 class OCR():
     def __init__(self):
         pass
     
     def getScreenshot(self,url):
-        # target = 'http://www.10xxoo.com/'
-        target = url
         save_to_file = 'screenshot.jpg'
         access_key = "b1da900243d8551000dabfa9074491bf"
-        viewport = '1440x900'
+        viewport_big = '1440x900'
+        viewport_small = '414x736'
         is_fullpage = '1'
         output_format = 'jpg'
         def calcSecret(target):
             a = hashlib.md5()
             a.update(target+"mountainlion")
             return a.hexdigest()
-        secret_key = calcSecret(target)
-        urllib.urlretrieve("http://api.screenshotlayer.com/api/capture?access_key="+access_key+"&secret_key="+secret_key+"&url="+urllib.quote_plus(target)+"&viewport="+viewport+"&fullpage="+is_fullpage+"&format="+output_format,save_to_file)
-        return save_to_file
-    
-    def getScreenShot(self,domain):
-        driver = webdriver.PhantomJS('/home/v/Installers/phantomjs',service_args=['--load-images=yes','--disk-cache=no'])
-        driver.get(domain)
-        driver.implicitly_wait(60)
-        driver.set_page_load_timeout(60)  ##设置超时时间
-        driver.set_window_size(1440, 900)
-        driver.save_screenshot('out.png')
-        driver.quit()
-    
+        secret_key = calcSecret(url)
+        screenshot_url = "http://api.screenshotlayer.com/api/capture?access_key="+access_key+"&secret_key="+secret_key+"&url="+urllib.quote_plus(url)+"&viewport="+viewport_small+"&fullpage="+is_fullpage+"&format="+output_format
+        return screenshot_url
+
     def extractImagesFromPage(self,url):        # 内有相对路径
         out_folder = './imgDL'
-        # url = 'https://www.dd164.com'
-
+        image_list = []
         ext = tldextract.extract(url)
-        domain = '.'.join(ext)
-        headers = {
-            'Host':domain,
-            'Accept':'*/*',
-            'Cache-Control':'max-age=0',
-            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/48.0.2564.116 Safari/537.36'
-        }
-        service_arglist=[
-            '--load-images=no',
-            '--disk-cache=no',
-            '--ignore-ssl-errors=true'
-        ]
-        for key, value in headers.iteritems():
-                webdriver.DesiredCapabilities.PHANTOMJS['phantomjs.page.customHeaders.{}'.format(key)] = value
-        driver = webdriver.PhantomJS('/home/v/Installers/phantomjs',service_args=service_arglist)
-        driver.implicitly_wait(10)
-        driver.set_page_load_timeout(50)  ##设置超时时间
-        driver.set_window_size(1440, 900)
-        try:
-            driver.get(url)
-        except Exception,e:
-            print "When getting url, exception happened:",e
-            driver.save_screenshot('getURLexception.png')
-        src = driver.page_source
-        soup = BeautifulSoup(src, 'html.parser')
+        def downloadToFile(url,targetPath,cookies=None):
+            print "Entering downloadToFile, loadtimeout=10,fetching...",url
+            session = requests.Session()
+            if cookies:
+                for cookie in cookies: 
+                    session.cookies.set(cookie['name'], cookie['value'])
+            response = session.get(url,timeout=(5,10))    # connect_timeout, load_timeout
+            roughsize = 0
+            with open(targetPath,'wb') as fd:   # using b(binary mode) to write image content.
+                for chunk in response.iter_content(1024):
+                    roughsize += 1024
+                    if roughsize > 5242880:
+                        break
+                    fd.write(chunk)             # 分片写入
+            return roughsize
 
+        def fetchSource(url):
+            print "Entering fetchSource, loadtimeout=30, fetching...",url
+            ext = tldextract.extract(url)
+            domain = '.'.join(ext)
+            headers = {
+                'Host':domain,
+                'Accept':'*/*',
+                'Cache-Control':'max-age=0',
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/48.0.2564.116 Safari/537.36'
+            }
+            service_arglist=[
+                '--load-images=no',
+                '--disk-cache=no',
+                '--ignore-ssl-errors=true'
+            ]
+            for key, value in headers.iteritems():
+                    webdriver.DesiredCapabilities.PHANTOMJS['phantomjs.page.customHeaders.{}'.format(key)] = value
+            driver = webdriver.PhantomJS('/home/v/Installers/phantomjs',service_args=service_arglist)
+            driver.implicitly_wait(10)
+            driver.set_page_load_timeout(30)   ##设置超时时间
+            driver.set_window_size(1440, 900)
+            try:
+                driver.get(url)                 # get url source
+                src = driver.page_source
+            except Exception,e:
+                print "When getting url, exception happened:",e
+                return 'Error'
+            driver.quit()
+            return src
+
+        soup = BeautifulSoup(fetchSource(url), 'html.parser')     # used fetchSource
         folder_to_save = ext[1]
         outFolderPath = os.path.join(out_folder,folder_to_save)
         if not os.path.exists(outFolderPath):
@@ -82,50 +95,35 @@ class OCR():
         for image in soup.findAll("img"):
             try:
                 image_url = urlparse.urljoin(url, image['src'])
-                print "image_url >> ",image_url
+                if image_url in image_list:
+                    continue
                 temp1 = "_".join(image["src"].split("/"))
                 m = hashlib.md5()
                 m.update(temp1)
                 filename=m.hexdigest()+image["src"].split("/")[-1]
-                print filename
                 folder_to_save = ext[1]
-                OutFilePath = os.path.join(out_folder,folder_to_save, filename)
+                filePath = os.path.join(out_folder,folder_to_save, filename)
             except Exception as e:
-                print "Some error between line 66-74 when getting ",image,": ",e
-                pass
+                #print "Some error between line 92-100 when getting ",image,": ",e
+                continue
             try:
-                session = requests.Session()
-                cookies = driver.get_cookies()
-                for cookie in cookies: 
-                    session.cookies.set(cookie['name'], cookie['value'])
-                response = session.get(image_url,timeout=(5,10))    # connect_timeout, load_timeout
-                roughsize = 0
-                print "saving url:",image_url
-                with open(OutFilePath,'wb') as fd:   # using b(binary mode) to write image content.
-                    for chunk in response.iter_content(1024):
-                        roughsize += 1024
-                        if roughsize > 5242880:
-                            break
-                        fd.write(chunk)             # 分片写入
-                if roughsize < 10000 or roughsize > 5242880:
-                    os.unlink(OutFilePath)
-                    print filename ," roughsize is: ",roughsize," not qualified, deleted."
+                size = downloadToFile(image_url,filePath)      # used downloadToFile
+                image_list.append(filePath)
+                if size < 10000 or size > 5242880:      # 删除不合格的文件
+                    os.unlink(filePath)
+                    image_list.remove(filePath)
             except Exception as e:
-                print "Get Image Exception : ",e
+                print "download Image Exception : ",e
                 pass
-        driver.quit()
+        if image_list == []:
+            filePath = os.path.join(out_folder,folder_to_save,'screenshot.jpg')
+            downloadToFile(self.getScreenshot(url),filePath)
+            image_list.append(filePath)
+        return set(image_list)
 
-
-    def PNGtoJPG(self,file):
-        # generate an 'out.jpg'
-        im = Image.open(file)
-        bg = Image.new("RGB", im.size, (255,255,255))
-        bg.paste(im,im)
-        bg.save('out.jpg')
-        os.remove(file)
-    
-    def extractWords(self):
-        default_inputfile = 'out.jpg'
+    def extractWords(self,filePath):
+        print "extracting word from :",filePath
+        default_inputfile = filePath
         datagen, headers = multipart_encode({"imageFile": open(default_inputfile, "rb")})
         headers['Host']='aligreen.alibaba.com'
         headers['Connection']='keep-alive'
@@ -139,37 +137,62 @@ class OCR():
         register_openers()
         request = urllib2.Request("http://aligreen.alibaba.com/rpc/image/upload_image.json", datagen, headers)
         upload_result = urllib2.urlopen(request).read()
-        print upload_result
+        #print upload_result
         tempdict = json.loads(upload_result)
         imageurl = tempdict['imageUploadResultList'][0]['imageUrl']
-        # Detection-----------------------------------------------------------
         detection_url = 'http://aligreen.alibaba.com/rpc/image/detect.json'
         payload = {'imageUrls[]': imageurl, 'scene': 'ocr'}
         headers = {'Host':'aligreen.alibaba.com','Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'Content-Length': '2'}
         r = requests.post(detection_url,data=payload)
-        print "r.text:--------------"
-        print r.text
-        sentence = json.loads(r.text)[0]['images'][0]['ocr']['text'][0]
+        #print r.text
+        try:
+            sentence = json.loads(r.text)[0]['images'][0]['ocr']['text'][0]
+        except:
+            return set([])
         temp = '/'.join(jieba.cut(sentence))
         words = temp.split("/"),type(temp.split("/"))
-        print words
-        return words
+        final_list = []
+        for i in words[0]:
+            if len(i) <= 1:
+                continue
+            if i in final_list:
+                continue
+            final_list.append(i)
+        return set(final_list)
 
     def categorizeResult(self, target):
-        a = set(target)
-        b = set([])
-        with open('sensitive_words.txt','r') as f:
-            for i in f.readlines():
-                b += i
-        print len(a.intersection(b))
+        c = {i:[] for i in sensitive_words.kd}
+        print "Final Keywords:",target
+        for i in sensitive_words.kd:
+            for j in target:
+                for t in sensitive_words.kd[i]:
+                    if j == t.decode('utf-8'):
+                        c[i].append(j)
+        biggest_size = 0
+        category = u''
+        for l in c:
+            if len(c[l])> biggest_size:
+                biggest=l.decode('utf-8')
+        print biggest
+        return category
 
-
+    def run(self,url):
+        ocr_result = set([])
+        li = self.extractImagesFromPage(url)
+        for image in li:
+            extracted = self.extractWords(image)
+            ocr_result = ocr_result | extracted
+        return self.categorizeResult(ocr_result)
+    
+    def clean(self,url):
+        out_folder = './imgDL'
+        ext = tldextract.extract(url)
+        folder_to_save = ext[1]
+        rmtree(os.path.join(out_folder,folder_to_save))
 
 
 if __name__ == '__main__':
-    #time.sleep(0.1)
-    #OCR().extractWords()
-    # OCR().getScreenshot()
-    # OCR().categorizeResult()
     a = OCR()
-    a.extractImagesFromPage('http://www.qgs-china.com')
+    #http://www.68169f.com
+    print a.run('http://www.s368.net')
+    a.clean('http://www.s368.net')
