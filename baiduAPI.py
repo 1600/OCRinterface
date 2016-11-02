@@ -3,8 +3,8 @@
 from Crypto.Hash import HMAC, SHA256
 import time
 
-ak = '409c17537b9b4b37aab4a5fc8a550383'
-sk = '05989fc6ee9a47e9b715eec9d046629d'
+ak = ''
+sk = ''
 canonical_header = '''
 POST /v1/recognize/text HTTP/1.1
 accept-encoding: gzip, deflate
