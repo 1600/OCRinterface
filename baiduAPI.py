@@ -14,7 +14,6 @@ accept: */*
 host: ocr.bj.baidubce.com
 content-type: application/json
 '''
-# authorization: bce-auth-v1/46bd9968a6194b4bbdf0341f2286ccce/2015-03-24T13:02:00Z/1800/host;x-bce-date/994014d96b0eb26578e039fa053a4f9003425da4bfedf33f4790882fb4c54903
 
 timepoint = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
